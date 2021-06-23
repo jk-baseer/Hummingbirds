@@ -12,7 +12,7 @@ import classes from './ProductDetails.module.css';
 import ArrowLogo from '../../assets/images/products/arrow.svg';
 import * as actions from '../../store/actions/index';
 import { selectProductDetails } from '../../store/selectors/product';
-
+import { selectUserId } from '../../store/selectors/auth';
 import Maps from '../../components/UI/Maps/Maps';
 
 class ProductDetails extends Component {
@@ -21,7 +21,6 @@ class ProductDetails extends Component {
   };
 
   componentDidMount() {
-    console.log('test', this.props.match.params.id);
     this.props.onInitProductDetails(this.props.match.params.id);
   }
 
@@ -106,6 +105,7 @@ class ProductDetails extends Component {
     }
     return <Skeleton count={10} />;
   };
+
   getStoreName = () => {
     const { productDetails } = this.props;
     if (productDetails.getIn(['listing', 'account', 'name'], '') !== '') {
@@ -120,62 +120,71 @@ class ProductDetails extends Component {
 
   getCategoryIds = () => {
     const { productDetails } = this.props;
-    if (productDetails.getIn(['listing', 'category_id'], List()).size > 0) {
-      return productDetails.getIn(['listing', 'category_id'], List()).join(', ');
+    if (productDetails.getIn(['listing', 'categories'], List()).size > 0) {
+      return productDetails
+        .getIn(['listing', 'categories'], List())
+        .map((item) => item.get('name'))
+        .join(', ');
     }
     return '';
   };
 
+  getAttributes = () => {
+    const { productDetails } = this.props;
+    if (productDetails.getIn(['listing', 'attributes'], List()).size > 0) {
+      return productDetails.getIn(['listing', 'attributes'], List()).map((attr, index) => {
+        return (
+          <React.Fragment key={index}>
+            <div className={classes.DetailsLeft + ' col-lg-6 col-sm-6 col-md-6'}>
+              {attr.get('name')}
+            </div>
+            <div className={classes.DetailsRight + ' col-lg-6 col-sm-6 col-md-6'}>
+              {attr
+                .get('values', List())
+                .map((item) => item.get('name'))
+                .join(', ')}
+            </div>
+          </React.Fragment>
+        );
+      });
+    }
+    return '';
+  };
+
+  getCoOrdinates = () => {
+    const { productDetails } = this.props;
+    if (productDetails.getIn(['listing', 'coordinates', 'latitude'], '') !== '') {
+      return (
+        <div className={classes.DetailsRight + ' col-lg-6'}>
+          <Modal show={this.state.maps} modalClosed={this.closeMaps}>
+            <Maps
+              lat={productDetails.getIn(['listing', 'coordinates', 'latitude'], '')}
+              lng={productDetails.getIn(['listing', 'coordinates', 'longitude'], '')}
+            />
+          </Modal>
+          <button type="button" className="btn btn-outline-success" onClick={this.showMaps}>
+            Get Direction
+          </button>
+        </div>
+      );
+    }
+    return '';
+  };
+
+  productLike = () => {
+    const { productDetails } = this.props;
+    const productId = productDetails.getIn(['listing', 'id'], '');
+    console.log('productDetails', productDetails, productId);
+    this.props.onProductLikeDisLike(productId);
+  };
+
   render() {
-    const { error, productDetails, message } = this.props;
+    const { error, productDetails, message, isAuthenticated } = this.props;
     let toastMessage = null;
     if (error) {
       toastMessage = <Toast type="error" message={message} />;
     }
-    console.log('productDetails', productDetails);
-    // let currencySymbol = <Skeleton />;
-    // let storeName = <Skeleton />;
-    // let storeAddress = <Skeleton count={2} />;
-    // let homeBanner = <Skeleton count={10} />;
-
-    // let coOrdinates1 = null;
-    // let coOrdinates2 = null;
-    // let maps = null;
-    // if (this.props.productDetails) {
-    //   if (this.props.productDetails.currency) {
-    //     currencySymbol = this.props.productDetails.currency.symbol;
-    //   }
-
-    //   if (this.props.productDetails.store) {
-    //     storeName = (
-    //       <Link to={'/store-details/' + this.props.productDetails.store.id}>
-    //         {this.props.productDetails.store.name}
-    //       </Link>
-    //     );
-    //     storeOwner =
-    //       this.props.productDetails.store.user.first_name +
-    //       '' +
-    //       this.props.productDetails.store.user.last_name;
-    //     storeAddress = this.props.productDetails.store.address;
-
-    //     if (this.props.productDetails.store.coordinates) {
-    //       coOrdinates1 = this.props.productDetails.store.coordinates.latitude;
-    //       coOrdinates2 = this.props.productDetails.store.coordinates.longitude;
-    //     }
-    //   }
-
-    // if (coOrdinates1 !== null && coOrdinates2 !== null) {
-    //   maps = (
-    //     <div className={classes.DeatilsRight + ' col-lg-6'}>
-    //       <Modal show={this.state.maps} modalClosed={this.closeMaps}>
-    //         <Maps lat={coOrdinates1} lng={coOrdinates2} />
-    //       </Modal>
-    //       <button type="button" className="btn btn-outline-success" onClick={this.showMaps}>
-    //         Get Direction
-    //       </button>
-    //     </div>
-    //   );
-    // }
+    console.log('isAuthenticated', isAuthenticated);
 
     return (
       <Aux>
@@ -207,11 +216,11 @@ class ProductDetails extends Component {
             </div>
 
             <div className={classes.Details + ' col-lg-12'}>
-              <h4>{productDetails.getIn(['listing', 'title'], '') || <Skeleton />}</h4>
+              <h4>{productDetails.getIn(['listing', 'title'], 'N/A')}</h4>
               <div> {this.getPrices()}</div>
               <span>Product Description</span>
               <div className={classes.Description}>
-                {productDetails.getIn(['listing', 'description'], '') || <Skeleton count="10" />}
+                {productDetails.getIn(['listing', 'description'], 'N/A')}
               </div>
             </div>
           </div>
@@ -225,6 +234,11 @@ class ProductDetails extends Component {
                 </div>
                 <div className="col-sm-6">
                   <button className="btnGreenStyle pull-right">Follow</button>
+                  {isAuthenticated !== '' && (
+                    <button onClick={this.productLike} className="btnGreenStyle pull-right  mr-10">
+                      Like
+                    </button>
+                  )}
                 </div>
               </div>
               <hr />
@@ -232,47 +246,42 @@ class ProductDetails extends Component {
               <h1 className="h1Headings">Details</h1>
 
               <div className="row">
-                <div className={classes.DeatilsLeft + ' col-lg-6 col-sm-6 col-md-6'}>Condition</div>
-                <div className={classes.DeatilsRight + ' col-lg-6 col-sm-6 col-md-6'}>
-                  Pre Loved
-                </div>
+                {this.getAttributes()}
 
-                <div className={classes.DeatilsLeft + ' col-lg-6 col-sm-6 col-md-6'}>
-                  Price Type
-                </div>
-                <div className={classes.DeatilsRight + ' col-lg-6 col-sm-6 col-md-6'}>Fixed</div>
-
-                <div className={classes.DeatilsLeft + ' col-lg-6 col-sm-6 col-md-6'}>Category</div>
-                <div className={classes.DeatilsRight + ' col-lg-6 col-sm-6 col-md-6'}>
+                <div className={classes.DetailsLeft + ' col-lg-6 col-sm-6 col-md-6'}>Category</div>
+                <div className={classes.DetailsRight + ' col-lg-6 col-sm-6 col-md-6'}>
                   {this.getCategoryIds()}
                 </div>
 
-                <div className={classes.DeatilsLeft + ' col-lg-6 col-sm-6 col-md-6'}>Location</div>
-                <div className={classes.DeatilsRight + ' col-lg-6 col-sm-6 col-md-6'}>
-                  {/* {storeAddress} */}
+                <div className={classes.DetailsLeft + ' col-lg-6 col-sm-6 col-md-6'}>Location</div>
+                <div className={classes.DetailsRight + ' col-lg-6 col-sm-6 col-md-6'}>
+                  {productDetails.getIn(['listing', 'location', 'formatted_address'], '')}
                 </div>
-                <div className={classes.DeatilsLeft + ' col-lg-6'}></div>
-                {/* {maps} */}
+                <div className={classes.DetailsLeft + ' col-lg-6'}></div>
+                {this.getCoOrdinates()}
               </div>
 
               <h1 className="h1Headings">Additional Details</h1>
 
               <div className="row">
-                <div className={classes.DeatilsLeft + ' col-lg-6 col-sm-6 col-md-6'}>
+                <div className={classes.DetailsLeft + ' col-lg-6 col-sm-6 col-md-6'}>
                   Deliver Details
                 </div>
-                <div className={classes.DeatilsRight + ' col-lg-6 col-sm-6 col-md-6'}>
+                <div className={classes.DetailsRight + ' col-lg-6 col-sm-6 col-md-6'}>
                   Home Delivery Available, Cash On Delivery
                 </div>
               </div>
 
               <br />
               <button type="button" className="btn btn-addtocart btn-lg btn-block height70">
+                Download App
+              </button>
+              {/* <button type="button" className="btn btn-addtocart btn-lg btn-block height70">
                 Add To Cart
               </button>
               <button type="button" className="btn btn-success btn-lg btn-block height70">
                 Buy Now
-              </button>
+              </button> */}
               <br />
               <br />
             </div>
@@ -292,12 +301,14 @@ const mapStateToProps = (state) => {
     loading: state.product.loading,
     message: state.product.message,
     productDetails: selectProductDetails(state),
+    isAuthenticated: selectUserId(state),
   };
 };
 
 const mapDispatchToProps = (dispatch) => {
   return {
     onInitProductDetails: (id) => dispatch(actions.initProductDetails(id)),
+    onProductLikeDisLike: (id) => dispatch(actions.onProductLikeDisLike(id)),
   };
 };
 
